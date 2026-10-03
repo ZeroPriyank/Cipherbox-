@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cipherbox — AES-256-GCM Encryption</title>
+<style>
+  :root{
+    --bg: #0F1420;
+    --panel: #171E2E;
+    --panel-2: #1D2740;
+    --border: #2A3348;
+    --text: #E4E7ED;
+    --muted: #8891A6;
+    --accent: #E8A33D;
+    --accent-dim: #7A5A26;
+    --ok: #4FA98C;
+    --danger: #E8615C;
+    --mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(232,163,61,0.06), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(79,169,140,0.05), transparent 45%);
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .lock-mark {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+
+  .brand-text .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 3px;
+  }
+
+  .brand-text h1 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- Tab dial ---------- */
+  .dial {
+    position: relative;
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 22px;
+  }
+
+  .dial-slider {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: calc(50% - 4px);
+    left: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--accent-dim);
+    border-radius: 9px;
+    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 0 0 1px rgba(232,163,61,0.08) inset;
+  }
+
+  .dial.mode-decrypt .dial-slider {
+    transform: translateX(100%);
+  }
+
+  .dial button {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 10px;
+    cursor: pointer;
+    border-radius: 9px;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+
+  .dial button.active {
+    color: var(--text);
+  }
+
+  /* ---------- Panels ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    display: none;
+  }
+
+  .panel.active {
+    display: block;
+    animation: fade-in 0.25s ease;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel h2 {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+
+  .panel .sub {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .char-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    resize: vertical;
+    background: #0C1119;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.55;
+    padding: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent-dim);
+  }
+
+  textarea::placeholder {
+    color: #4A5470;
+  }
+
+  .pass-row {
+    position: relative;
+  }
+
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    background: #0C1119;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13.5px;
+    padding: 12px 44px 12px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="text"]:focus, input[type="password"]:focus {
+    border-color: var(--accent-dim);
+  }
+
+  .toggle-vis {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 6px 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .toggle-vis:hover { color: var(--text); }
+
+  .hint {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    margin-bottom: 18px;
+  }
+
+  button.primary {
+    flex: 1;
+    background: var(--accent);
+    color: #1A1204;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 18px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.primary:active:not(:disabled) { transform: scale(0.99); }
+
+  button.primary:disabled {
+    background: var(--panel-2);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+
+  button.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 13px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  button.ghost:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  /* ---------- Output ---------- */
+  .output-box {
+    background: #0C1119;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 90px;
+  }
+
+  .output-box.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4A5470;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  .output-text {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    word-break: break-all;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+
+  .output-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  button.copy {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  button.copy:hover { border-color: var(--accent-dim); }
+
+  .status {
+    font-size: 12.5px;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 18px;
+  }
+
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--danger); }
+
+  /* ---------- How it works ---------- */
+  details.how {
+    margin-top: 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+  }
+
+  details.how summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  details.how summary::-webkit-details-marker { display: none; }
+
+  .caret { transition: transform 0.2s; color: var(--accent); }
+  details.how[open] .caret { transform: rotate(90deg); }
+
+  .steps {
+    margin-top: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(232,163,61,0.1);
+    border: 1px solid var(--accent-dim);
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .step strong { color: var(--text); }
+
+  footer.note {
+    text-align: center;
+    margin-top: 22px;
+    font-size: 11.5px;
+    color: #4A5470;
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 22px 14px 48px; }
+    .brand-text h1 { font-size: 19px; }
+    .btn-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="lock-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="17" width="32" height="19" rx="4" fill="#171E2E" stroke="#E8A33D" stroke-width="1.5"/>
+      <path d="M11 17V12a9 9 0 0 1 18 0v5" stroke="#E8A33D" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="20" cy="25" r="2.6" fill="#E8A33D"/>
+      <rect x="19" y="26.5" width="2" height="5" rx="1" fill="#E8A33D"/>
+    </svg>
+    <div class="brand-text">
+      <p class="eyebrow">AES-256-GCM · Runs entirely in your browser</p>
+      <h1>Cipherbox</h1>
+    </div>
+  </header>
+
+  <div class="dial" id="dial">
+    <div class="dial-slider"></div>
+    <button id="tab-encrypt" class="active" onclick="setMode('encrypt')">🔒 Encrypt</button>
+    <button id="tab-decrypt" onclick="setMode('decrypt')">🔓 Decrypt</button>
+  </div>
+
+  <!-- ENCRYPT PANEL -->
+  <section class="panel active" id="panel-encrypt">
+    <h2>Encrypt Text</h2>
+    <p class="sub">Your text never leaves this page. Encryption happens locally using the Web Crypto API.</p>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="enc-input">Plain text</label>
+        <span class="char-count" id="enc-input-count">0 characters</span>
+      </div>
+      <textarea id="enc-input" placeholder="Type or paste the text you want to encrypt…" oninput="onEncInput()"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="enc-pass">Password / key</label>
+      <div class="pass-row">
+        <input type="password" id="enc-pass" placeholder="Choose a password to encrypt with" oninput="onEncInput()">
+        <button class="toggle-vis" onclick="toggleVis('enc-pass', this)">SHOW</button>
+      </div>
+      <p class="hint">Used to derive your AES key via PBKDF2. You'll need this exact password to decrypt later — it isn't stored anywhere.</p>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="enc-btn" disabled onclick="doEncrypt()">
+        <span>🔒</span> Encrypt
+      </button>
+      <button class="ghost" onclick="clearPanel('encrypt')">Clear</button>
+    </div>
+
+    <label>Encrypted output</label>
+    <div class="output-box empty" id="enc-output-wrap">
+      <span>Encrypted text will appear here</span>
+    </div>
+    <div class="output-foot">
+      <div class="status" id="enc-status"></div>
+      <button class="copy" id="enc-copy" style="display:none" onclick="copyOutput('enc')">Copy</button>
+    </div>
+  </section>
+
+  <!-- DECRYPT PANEL -->
+  <section class="panel" id="panel-decrypt">
+    <h2>Decrypt Text</h2>
+    <p class="sub">Paste ciphertext produced by the Encrypt tab, along with the matching password.</p>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="dec-input">Encrypted text</label>
+        <span class="char-count" id="dec-input-count">0 characters</span>
+      </div>
+      <textarea id="dec-input" placeholder="Paste the encrypted text here…" oninput="onDecInput()"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="dec-pass">Password / key</label>
+      <div class="pass-row">
+        <input type="password" id="dec-pass" placeholder="Enter the password used to encrypt" oninput="onDecInput()">
+        <button class="toggle-vis" onclick="toggleVis('dec-pass', this)">SHOW</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="dec-btn" disabled onclick="doDecrypt()">
+        <span>🔓</span> Decrypt
+      </button>
+      <button class="ghost" onclick="clearPanel('decrypt')">Clear</button>
+    </div>
+
+    <label>Decrypted output</label>
+    <div class="output-box empty" id="dec-output-wrap">
+      <span>Decrypted text will appear here</span>
+    </div>
+    <div class="output-foot">
+      <div class="status" id="dec-status"></div>
+      <button class="copy" id="dec-copy" style="display:none" onclick="copyOutput('dec')">Copy</button>
+    </div>
+  </section>
+
+  <details class="how">
+    <summary>How it works <span class="caret">▶</span></summary>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <p><strong>Key derivation.</strong> Your password is run through PBKDF2 (SHA-256, 250,000 iterations) to produce a 256-bit AES key. The raw password itself is never used directly as a key.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <p><strong>Encryption.</strong> Your text is encrypted with AES-GCM, an authenticated cipher — meaning any tampering with the ciphertext is detected automatically.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <p><strong>Fresh randomness.</strong> A random 16-byte salt and 12-byte IV (nonce) are generated with <code>crypto.getRandomValues</code> on every single encryption, even for identical text and password.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <p><strong>Self-contained output.</strong> The salt, IV, and ciphertext are packed together and Base64-encoded into one copy-paste-safe block, so the Decrypt tab can pull everything it needs back out.</p>
+      </div>
+    </div>
+  </details>
+
+  <footer class="note">No network requests. No servers. No stored keys. Everything happens in this browser tab.</footer>
+  <footer class="note" style="margin-top: 6px;">Made By Priyank Sharma</footer>
+
+</div>
+
+<script>
+  // ---------- Tab switching ----------
+  function setMode(mode) {
+    document.getElementById('dial').classList.toggle('mode-decrypt', mode === 'decrypt');
+    document.getElementById('tab-encrypt').classList.toggle('active', mode === 'encrypt');
+    document.getElementById('tab-decrypt').classList.toggle('active', mode === 'decrypt');
+    document.getElementById('panel-encrypt').classList.toggle('active', mode === 'encrypt');
+    document.getElementById('panel-decrypt').classList.toggle('active', mode === 'decrypt');
+  }
+
+  function toggleVis(id, btn) {
+    const el = document.getElementById(id);
+    const showing = el.type === 'text';
+    el.type = showing ? 'password' : 'text';
+    btn.textContent = showing ? 'SHOW' : 'HIDE';
+  }
+
+  // ---------- Input handlers ----------
+  function onEncInput() {
+    const text = document.getElementById('enc-input').value;
+    const pass = document.getElementById('enc-pass').value;
+    document.getElementById('enc-input-count').textContent = text.length + ' character' + (text.length === 1 ? '' : 's');
+    document.getElementById('enc-btn').disabled = !(text.length > 0 && pass.length > 0);
+  }
+
+  function onDecInput() {
+    const text = document.getElementById('dec-input').value;
+    const pass = document.getElementById('dec-pass').value;
+    document.getElementById('dec-input-count').textContent = text.length + ' character' + (text.length === 1 ? '' : 's');
+    document.getElementById('dec-btn').disabled = !(text.length > 0 && pass.length > 0);
+  }
+
+  function clearPanel(mode) {
+    if (mode === 'encrypt') {
+      document.getElementById('enc-input').value = '';
+      document.getElementById('enc-pass').value = '';
+      onEncInput();
+      setOutput('enc', null);
+      setStatus('enc', '', '');
+    } else {
+      document.getElementById('dec-input').value = '';
+      document.getElementById('dec-pass').value = '';
+      onDecInput();
+      setOutput('dec', null);
+      setStatus('dec', '', '');
+    }
+  }
+
+  function setOutput(prefix, text) {
+    const wrap = document.getElementById(prefix + '-output-wrap');
+    const copyBtn = document.getElementById(prefix + '-copy');
+    if (!text) {
+      wrap.className = 'output-box empty';
+      wrap.innerHTML = '<span>' + (prefix === 'enc' ? 'Encrypted' : 'Decrypted') + ' text will appear here</span>';
+      copyBtn.style.display = 'none';
+      return;
+    }
+    wrap.className = 'output-box';
+    wrap.innerHTML = '';
+    const pre = document.createElement('div');
+    pre.className = 'output-text';
+    pre.id = prefix + '-output-text';
+    pre.textContent = text;
+    wrap.appendChild(pre);
+    copyBtn.style.display = 'inline-block';
+  }
+
+  function setStatus(prefix, msg, kind) {
+    const el = document.getElementById(prefix + '-status');
+    el.textContent = msg;
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  async function copyOutput(prefix) {
+    const el = document.getElementById(prefix + '-output-text');
+    if (!el) return;
+    try {
+      await navigator.clipboard.writeText(el.textContent);
+      const btn = document.getElementById(prefix + '-copy');
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1400);
+    } catch (e) {
+      // fallback
+      const range = document.createRange();
+      range.selectNode(el);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      window.getSelection().removeAllRanges();
+    }
+  }
+
+  // ---------- Crypto core ----------
+  const PBKDF2_ITERATIONS = 250000;
+  const SALT_LEN = 16;
+  const IV_LEN = 12;
+
+  function bufToBase64(buf) {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function base64ToBuf(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function deriveKey(password, salt, usage) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: PBKDF2_ITERATIONS,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      [usage]
+    );
+  }
+
+  async function encryptText(plainText, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+    const key = await deriveKey(password, salt, 'encrypt');
+    const enc = new TextEncoder();
+    const ciphertextBuf = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      enc.encode(plainText)
+    );
+
+    const ciphertextBytes = new Uint8Array(ciphertextBuf);
+    const combined = new Uint8Array(SALT_LEN + IV_LEN + ciphertextBytes.length);
+    combined.set(salt, 0);
+    combined.set(iv, SALT_LEN);
+    combined.set(ciphertextBytes, SALT_LEN + IV_LEN);
+
+    return bufToBase64(combined.buffer);
+  }
+
+  async function decryptText(packedB64, password) {
+    let combined;
+    try {
+      combined = base64ToBuf(packedB64.trim());
+    } catch (e) {
+      throw new Error('invalid-format');
+    }
+    if (combined.length < SALT_LEN + IV_LEN + 1) {
+      throw new Error('invalid-format');
+    }
+    const salt = combined.slice(0, SALT_LEN);
+    const iv = combined.slice(SALT_LEN, SALT_LEN + IV_LEN);
+    const ciphertext = combined.slice(SALT_LEN + IV_LEN);
+
+    const key = await deriveKey(password, salt, 'decrypt');
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      ciphertext
+    ); // throws on wrong password / tampered data — caught by caller
+
+    return new TextDecoder().decode(plainBuf);
+  }
+
+  // ---------- Button actions ----------
+  async function doEncrypt() {
+    const btn = document.getElementById('enc-btn');
+    const text = document.getElementById('enc-input').value;
+    const pass = document.getElementById('enc-pass').value;
+    if (!text || !pass) return;
+
+    btn.disabled = true;
+    setStatus('enc', 'Encrypting…', '');
+    try {
+      const result = await encryptText(text, pass);
+      setOutput('enc', result);
+      setStatus('enc', '✓ Encrypted successfully', 'ok');
+    } catch (e) {
+      setOutput('enc', null);
+      setStatus('enc', 'Encryption failed — please try again.', 'err');
+    }
+    btn.disabled = false;
+  }
+
+  async function doDecrypt() {
+    const btn = document.getElementById('dec-btn');
+    const text = document.getElementById('dec-input').value;
+    const pass = document.getElementById('dec-pass').value;
+    if (!text || !pass) return;
+
+    btn.disabled = true;
+    setStatus('dec', 'Decrypting…', '');
+    try {
+      const result = await decryptText(text, pass);
+      setOutput('dec', result);
+      setStatus('dec', '✓ Decrypted successfully', 'ok');
+    } catch (e) {
+      setOutput('dec', null);
+      setStatus('dec', 'Unable to decrypt: incorrect password or invalid encrypted text.', 'err');
+    }
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>
